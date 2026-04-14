@@ -1,0 +1,96 @@
+name: TehNio Auto Posts
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run without publishing to Telegram"
+        required: false
+        default: false
+        type: boolean
+      verbose:
+        description: "Print extended logs"
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tehnio-auto-posts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Prepare runtime config
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AUTO_NEWS_PUBLICATION_TITLE: ${{ vars.AUTO_NEWS_PUBLICATION_TITLE }}
+          AUTO_NEWS_SUBSCRIBE_CTA_TEXT: ${{ vars.AUTO_NEWS_SUBSCRIBE_CTA_TEXT }}
+          AUTO_NEWS_LINK_TEXT: ${{ vars.AUTO_NEWS_LINK_TEXT }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          AUTO_NEWS_MAX_POSTS_PER_CYCLE: ${{ vars.AUTO_NEWS_MAX_POSTS_PER_CYCLE }}
+          AUTO_NEWS_MIN_PUBLISH_GAP_MINUTES: ${{ vars.AUTO_NEWS_MIN_PUBLISH_GAP_MINUTES }}
+        run: |
+          python3 scripts/build_ci_config.py --base config.tehnio.example.json --output config.ci.json
+
+      - name: Run bot
+        env:
+          INPUT_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+          INPUT_VERBOSE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.verbose || 'true' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          args=(--config config.ci.json --once)
+
+          if [[ "${INPUT_DRY_RUN}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+
+          if [[ "${INPUT_VERBOSE}" == "true" || "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            args+=(--verbose)
+          fi
+
+          python3 main.py "${args[@]}"
+
+      - name: Commit updated state
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
+        run: |
+          if [[ ! -f state/news.db ]]; then
+            echo "state/news.db not found, nothing to commit"
+            exit 0
+          fi
+
+          if git diff --quiet -- state/news.db; then
+            echo "No state changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add state/news.db
+          git commit -m "chore: update bot state"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin HEAD:"${GITHUB_REF_NAME}"

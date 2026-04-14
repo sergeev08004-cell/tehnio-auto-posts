@@ -1,0 +1,186 @@
+{
+  "telegram": {
+    "bot_token": "",
+    "bot_token_env": "TELEGRAM_BOT_TOKEN",
+    "channel_id": "@TehNio",
+    "parse_mode": "HTML",
+    "disable_web_page_preview": false
+  },
+  "poll_interval_minutes": 30,
+  "max_posts_per_cycle": 3,
+  "min_post_age_minutes": 5,
+  "max_post_age_hours": 24,
+  "min_publish_gap_minutes": 20,
+  "request_timeout_seconds": 20,
+  "database_path": "state/news.db",
+  "user_agent": "AutoNewsBot/1.0 (+https://t.me/TehNio)",
+  "publication_title": "TehNio",
+  "translation": {
+    "enabled": true,
+    "provider": "google_web",
+    "target_language": "ru",
+    "source_languages": [
+      "en"
+    ]
+  },
+  "editorial": {
+    "profile": "tehnio",
+    "insider_label": "🕵️‍♂️ ИНСАЙД",
+    "news_label": "✅ НОВОСТЬ",
+    "link_text": "Источник и детали",
+    "persona_comments_enabled": true,
+    "subscribe_cta_text": "⚔️ Вступить в легион TehNio!"
+  },
+  "llm": {
+    "enabled": false,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 0.6,
+    "summary_max_sentences": 4,
+    "persona_max_chars": 180
+  },
+  "diversity": {
+    "enabled": true,
+    "max_per_publisher": 1,
+    "max_per_topic": 2,
+    "topic_repeat_penalty": 1.2,
+    "publisher_repeat_penalty": 0.85,
+    "topic_limits": {
+      "recalls": 1
+    }
+  },
+  "sources": [
+    {
+      "name": "Mark Gurman X (RSS bridge)",
+      "url": "https://example.com/replace-mark-gurman-rss.xml",
+      "language": "en",
+      "group": "gurman",
+      "weight": 1.35,
+      "enabled": false
+    },
+    {
+      "name": "Ming-Chi Kuo X (RSS bridge)",
+      "url": "https://example.com/replace-ming-chi-kuo-rss.xml",
+      "language": "en",
+      "group": "kuo",
+      "weight": 1.35,
+      "enabled": false
+    },
+    {
+      "name": "Ice Universe X (RSS bridge)",
+      "url": "https://example.com/replace-ice-universe-rss.xml",
+      "language": "en",
+      "group": "iceuniverse",
+      "weight": 1.2,
+      "enabled": false
+    },
+    {
+      "name": "Digital Chat Station X (RSS bridge)",
+      "url": "https://example.com/replace-dcs-rss.xml",
+      "language": "en",
+      "group": "digitalchatstation",
+      "weight": 1.2,
+      "enabled": false
+    },
+    {
+      "name": "LeaksApplePro X (RSS bridge)",
+      "url": "https://example.com/replace-leaksapplepro-rss.xml",
+      "language": "en",
+      "group": "leaksapplepro",
+      "weight": 1.15,
+      "enabled": false
+    },
+    {
+      "name": "The Verge",
+      "url": "https://www.theverge.com/rss/index.xml",
+      "language": "en",
+      "group": "theverge",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "Engadget",
+      "url": "https://www.engadget.com/rss.xml",
+      "language": "en",
+      "group": "engadget",
+      "weight": 1.1,
+      "enabled": true
+    },
+    {
+      "name": "TechCrunch",
+      "url": "https://techcrunch.com/feed/",
+      "language": "en",
+      "group": "techcrunch",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "MIT Technology Review",
+      "url": "https://www.technologyreview.com/feed/",
+      "language": "en",
+      "group": "mittechnologyreview",
+      "weight": 1.1,
+      "enabled": true
+    },
+    {
+      "name": "OpenAI News",
+      "url": "https://openai.com/news/rss.xml",
+      "language": "en",
+      "group": "openai",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "9to5Mac",
+      "url": "https://9to5mac.com/feed/",
+      "language": "en",
+      "group": "9to5mac",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "MacRumors",
+      "url": "https://www.macrumors.com/macrumors.xml",
+      "language": "en",
+      "group": "macrumors",
+      "weight": 1.1,
+      "enabled": true
+    }
+  ],
+  "allowed_topics": [
+    "gadgets",
+    "technology",
+    "new_models",
+    "prices"
+  ],
+  "priority_topics": [
+    "gadgets",
+    "technology",
+    "new_models",
+    "prices"
+  ],
+  "blocked_keywords": [
+    "обзор",
+    "сравнение",
+    "подборка",
+    "мнение",
+    "колонка",
+    "review",
+    "opinion",
+    "editorial",
+    "podcast",
+    "gallery",
+    "video",
+    "sponsored",
+    "funding",
+    "seed round",
+    "series a",
+    "series b",
+    "earnings",
+    "ipo",
+    "lawsuit",
+    "politics",
+    "election"
+  ]
+}

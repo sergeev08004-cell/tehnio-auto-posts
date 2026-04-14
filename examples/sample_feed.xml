@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample Auto Feed</title>
+    <link>https://example.com</link>
+    <description>Sample feed for local dry runs</description>
+    <item>
+      <title>Показан смартфон с экраном 6,7 дюйма и камерой 50 Мп</title>
+      <link>https://example.com/news/gadget-001</link>
+      <description><![CDATA[<img src="https://example.com/images/gadget-001.jpg" />Производитель представил новый смартфон. Устройство получило экран 6,7 дюйма, память 256 ГБ, камеру 50 Мп и цену от 699 долларов.]]></description>
+      <pubDate>Wed, 25 Mar 2026 18:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>OpenAI показала AI-ассистента для работы с приложениями</title>
+      <link>https://example.com/news/tech-002</link>
+      <description>Компания раскрыла новую платформу с AI-ассистентом. Сервис умеет работать с приложениями, обрабатывать голосовые команды и автоматизировать рутинные действия без ручных сценариев.</description>
+      <enclosure url="https://example.com/images/tech-002.jpg" type="image/jpeg" />
+      <pubDate>Wed, 25 Mar 2026 17:40:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Тест-драйв нового седана в зимних условиях</title>
+      <link>https://example.com/review/test-drive-003</link>
+      <description>Редакция делится впечатлениями от поездки и сравнивает настройки шасси.</description>
+      <pubDate>Wed, 25 Mar 2026 17:10:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

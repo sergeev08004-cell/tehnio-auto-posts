@@ -1,0 +1,1 @@
+"""Auto news bot package."""

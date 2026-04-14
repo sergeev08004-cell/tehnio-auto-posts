@@ -1,0 +1,6 @@
+config.json
+config.publish_now.json
+config.ci.json
+data/
+__pycache__/
+news_bot/__pycache__/

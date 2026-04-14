@@ -1,0 +1,150 @@
+{
+  "telegram": {
+    "bot_token": "PASTE_TELEGRAM_BOT_TOKEN_HERE",
+    "channel_id": "@your_channel_name",
+    "parse_mode": "HTML",
+    "disable_web_page_preview": false
+  },
+  "poll_interval_minutes": 30,
+  "max_posts_per_cycle": 3,
+  "min_post_age_minutes": 5,
+  "max_post_age_hours": 24,
+  "min_publish_gap_minutes": 20,
+  "request_timeout_seconds": 20,
+  "database_path": "data/news.db",
+  "user_agent": "AutoNewsBot/1.0 (+https://t.me/your_channel_name)",
+  "publication_title": "",
+  "translation": {
+    "enabled": true,
+    "provider": "google_web",
+    "target_language": "ru",
+    "source_languages": [
+      "en"
+    ]
+  },
+  "editorial": {
+    "profile": "default",
+    "insider_label": "🕵️‍♂️ ИНСАЙД",
+    "news_label": "✅ НОВОСТЬ",
+    "link_text": "Подробности ниже 👇",
+    "persona_comments_enabled": false,
+    "subscribe_cta_text": ""
+  },
+  "llm": {
+    "enabled": false,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "api_key_env": "OPENAI_API_KEY",
+    "temperature": 0.6,
+    "summary_max_sentences": 4,
+    "persona_max_chars": 180
+  },
+  "diversity": {
+    "enabled": true,
+    "max_per_publisher": 1,
+    "max_per_topic": 2,
+    "topic_repeat_penalty": 1.15,
+    "publisher_repeat_penalty": 0.85,
+    "topic_limits": {
+      "recalls": 1
+    }
+  },
+  "sources": [
+    {
+      "name": "Bloomberg Tech",
+      "url": "https://feeds.bloomberg.com/technology/news.rss",
+      "language": "en",
+      "group": "bloomberg",
+      "weight": 1.25,
+      "enabled": true
+    },
+    {
+      "name": "CNBC Tech",
+      "url": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
+      "language": "en",
+      "group": "cnbc",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "The Verge",
+      "url": "https://www.theverge.com/rss/index.xml",
+      "language": "en",
+      "group": "theverge",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "TechCrunch",
+      "url": "https://techcrunch.com/feed/",
+      "language": "en",
+      "group": "techcrunch",
+      "weight": 1.15,
+      "enabled": true
+    },
+    {
+      "name": "WIRED",
+      "url": "https://www.wired.com/feed/rss",
+      "language": "en",
+      "group": "wired",
+      "weight": 1.1,
+      "enabled": true
+    },
+    {
+      "name": "Ars Technica",
+      "url": "https://feeds.arstechnica.com/arstechnica/index",
+      "language": "en",
+      "group": "arstechnica",
+      "weight": 1.1,
+      "enabled": true
+    }
+  ],
+  "allowed_topics": [
+    "gadgets",
+    "technology"
+  ],
+  "priority_topics": [
+    "gadgets",
+    "technology",
+    "electric"
+  ],
+  "blocked_keywords": [
+    "тест-драйв",
+    "обзор",
+    "сравнение",
+    "подборка",
+    "мнение",
+    "колонка",
+    "фото",
+    "видео",
+    "галерея",
+    "опыт владения",
+    "review",
+    "first drive",
+    "first drives",
+    "driving notes",
+    "why buy",
+    "comparison",
+    "opinion",
+    "editorial",
+    "podcast",
+    "sponsored",
+    "list",
+    "lists",
+    "spy shot",
+    "spyshots",
+    "buying guide",
+    "buying guides",
+    "gallery",
+    "video",
+    "funding",
+    "seed round",
+    "series a",
+    "series b",
+    "earnings",
+    "ipo",
+    "lawsuit",
+    "politics",
+    "election"
+  ]
+}
