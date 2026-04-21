@@ -452,6 +452,8 @@ def _format_post(
     analysis = analyze_news_item(item, title, summary, compact=compact)
     variants = build_post_variants(item, title, analysis, compact=compact)
     best_variant = choose_best_variant(variants)
+    if config.editorial.profile.lower() == "tehnio":
+        return render_tehnio_post(best_variant, item, analysis, config=config, max_length=max_length, compact=compact)
     return render_post_variant(best_variant, item, config=config, max_length=max_length)
 
 
@@ -576,6 +578,70 @@ def compose_post_text(
     lines.extend(["", build_story_link(url, config)])
     if hashtags:
         lines.extend(["", render_hashtags(hashtags)])
+    subscribe_cta = build_subscribe_cta(config)
+    if subscribe_cta:
+        lines.extend(["", subscribe_cta])
+    return "\n".join(lines).strip()
+
+
+def render_tehnio_post(
+    variant: PostVariant,
+    item: CandidateItem,
+    analysis: NewsAnalysis,
+    config: AppConfig,
+    max_length: int,
+    compact: bool
+) -> str:
+    intro_paragraphs = build_tehnio_intro_paragraphs(item, analysis, compact=compact)
+    facts = build_tehnio_fact_lines(item, analysis, max_items=3 if compact else 4)
+    hashtags = build_tehnio_hashtags(item, analysis, max_items=6 if compact else 9)
+    headline = build_tehnio_headline(item, analysis, variant.headline)
+
+    while True:
+        text = compose_tehnio_post_text(headline, intro_paragraphs, facts, item, hashtags, config)
+        if len(text) <= max_length:
+            return text
+        if len(facts) > 2:
+            facts = facts[:-1]
+            continue
+        if len(hashtags) > 5:
+            hashtags = hashtags[:-1]
+            continue
+        if len(intro_paragraphs) > 1:
+            intro_paragraphs = intro_paragraphs[:1]
+            continue
+        shortened = [truncate(paragraph, 180 if index == 0 else 130) for index, paragraph in enumerate(intro_paragraphs)]
+        return compose_tehnio_post_text(headline, shortened, facts[:2], item, hashtags[:5], config)
+
+
+def compose_tehnio_post_text(
+    headline: str,
+    intro_paragraphs: list[str],
+    facts: list[str],
+    item: CandidateItem,
+    hashtags: list[str],
+    config: AppConfig
+) -> str:
+    lines = [build_headline(item, headline, config), ""]
+    for paragraph in intro_paragraphs:
+        clean = paragraph.strip()
+        if clean:
+            lines.append(escape_text(clean))
+
+    if facts:
+        lines.extend(["", "📌 <b>Что известно:</b>"])
+        for fact in facts:
+            lines.append(f"— {escape_text(fact)}")
+
+    persona_lines = render_tehnio_persona(item)
+    if persona_lines:
+        lines.extend(["", *persona_lines])
+
+    lines.extend(["", build_story_link(item.url, config)])
+
+    if hashtags:
+        lines.extend(["", render_tehnio_hashtags(hashtags)])
+
     subscribe_cta = build_subscribe_cta(config)
     if subscribe_cta:
         lines.extend(["", subscribe_cta])
@@ -2172,6 +2238,25 @@ def render_persona_comments(item: CandidateItem, config: AppConfig) -> list[str]
     return [f"<blockquote><b>{escape_text(persona_name)}</b>\n{escape_text(clean)}</blockquote>"]
 
 
+def render_tehnio_persona(item: CandidateItem) -> list[str]:
+    if not item.persona_comment:
+        return []
+
+    persona_labels = {
+        "Архимед Сиракузский": "Архимед",
+        "Диоген Синопский": "Диоген",
+        "Геродот": "Геродот",
+    }
+    persona_name = persona_labels.get(item.persona_name, item.persona_name or "Комментарий")
+    comment = strip_wrapping_quotes(item.persona_comment.strip())
+    if not comment:
+        return []
+    return [
+        f"💬 <b>{escape_text(persona_name)}:</b>",
+        f"«{escape_text(comment)}»",
+    ]
+
+
 def build_story_link(url: str, config: AppConfig) -> str:
     return f"<a href=\"{escape_attr(url)}\">{escape_text(config.editorial.link_text)}</a>"
 
@@ -2185,6 +2270,293 @@ def build_subscribe_cta(config: AppConfig) -> str:
         handle = channel_id.lstrip("@")
         return f"<a href=\"https://t.me/{escape_attr(handle)}\">{escape_text(cta_text)}</a>"
     return escape_text(cta_text)
+
+
+def build_tehnio_headline(item: CandidateItem, analysis: NewsAnalysis, fallback_headline: str) -> str:
+    heuristic_headline = build_tehnio_fallback_headline(item, analysis)
+    candidates = [item.generated_headline, heuristic_headline, fallback_headline, compress_title_headline(item.title), item.title]
+    for value in candidates:
+        raw = (value or "").strip()
+        if not raw:
+            continue
+        clean = fit_headline_to_limit(neutralize_headline(raw), max_words=12)
+        if clean and not looks_untranslated_text(clean):
+            return clean
+    return heuristic_headline or "Новая история в мире технологий"
+
+
+def build_tehnio_fallback_headline(item: CandidateItem, analysis: NewsAnalysis) -> str:
+    haystack = f"{item.title} {item.summary}".lower()
+    brand = detect_tehnio_primary_brand(item)
+    subject = shorten_subject(analysis.subject or "")
+    generic_subjects = {comparable_text_key(value) for value in GENERIC_HEADLINE_SUBJECTS}
+
+    if "android xr" in haystack and "vision pro" in haystack:
+        if brand:
+            return f"{brand} готовит ответ Vision Pro — Android XR"
+        return "Android XR готовят как ответ Vision Pro"
+    if "android xr" in haystack:
+        if brand:
+            return f"{brand} развивает платформу Android XR"
+        return "Android XR выходит в центр новой гонки"
+    if "gemini" in haystack and brand:
+        return f"{brand} делает ставку на устройства с Gemini"
+    if brand and subject and comparable_text_key(subject) not in generic_subjects:
+        return f"{brand} раскрыла детали о {subject}"
+    if brand:
+        return f"{brand} в центре новой техноистории"
+    return "Технологическая новость дня"
+
+
+def build_tehnio_intro_paragraphs(item: CandidateItem, analysis: NewsAnalysis, compact: bool) -> list[str]:
+    if item.generated_intro:
+        intro = normalize_tehnio_intro_text(item.generated_intro, limit=260 if compact else 360)
+        return [intro] if intro else []
+
+    heuristic_intro = build_tehnio_intro_heuristic(item)
+    if heuristic_intro:
+        intro = normalize_tehnio_intro_text(heuristic_intro, limit=260 if compact else 360)
+        if intro:
+            return [intro]
+
+    sentences: list[str] = []
+    seen: set[str] = set()
+    candidates = [
+        analysis.core,
+        first_distinct_sentence(analysis.story_points, exclude=[item.title, analysis.core]),
+        analysis.interesting,
+        analysis.takeaway,
+        build_generic_summary_paragraph(item, analysis),
+    ]
+
+    for candidate in candidates:
+        clean = normalize_tehnio_intro_sentence(candidate, limit=145 if compact else 180)
+        if not clean:
+            continue
+        key = comparable_text_key(clean)
+        if key in seen or key == comparable_text_key(item.title):
+            continue
+        seen.add(key)
+        sentences.append(clean)
+        if len(sentences) >= (2 if compact else 2):
+            break
+
+    if len(sentences) < 2:
+        for candidate in split_story_sentences(item.summary or "", max_items=6):
+            clean = normalize_tehnio_intro_sentence(candidate, limit=145 if compact else 180)
+            if not clean:
+                continue
+            key = comparable_text_key(clean)
+            if key in seen or key == comparable_text_key(item.title):
+                continue
+            seen.add(key)
+            sentences.append(clean)
+            if len(sentences) >= 2:
+                break
+
+    if not sentences:
+        fallback = normalize_tehnio_intro_text(build_generic_summary_paragraph(item, analysis), limit=170)
+        return [fallback] if fallback else []
+
+    intro = " ".join(sentence.rstrip(".") + "." for sentence in sentences).strip()
+    return [intro]
+
+
+def build_tehnio_fact_lines(item: CandidateItem, analysis: NewsAnalysis, max_items: int) -> list[str]:
+    if item.generated_facts:
+        facts = [normalize_fact_candidate(value, limit=86) for value in item.generated_facts]
+        return [fact for fact in facts if fact][:max_items]
+
+    candidates: list[str] = []
+    seen: set[str] = set()
+    haystack = f"{item.title} {item.summary}".lower()
+
+    for value in analysis.specs + analysis.numbers:
+        clean = normalize_fact_candidate(value)
+        if clean and clean.lower() not in seen:
+            seen.add(clean.lower())
+            candidates.append(clean)
+        if len(candidates) >= max_items:
+            return candidates
+
+    for sentence in split_story_sentences(item.summary or "", max_items=8):
+        clean = normalize_fact_candidate(sentence)
+        if not clean or clean.lower() in seen:
+            continue
+        seen.add(clean.lower())
+        candidates.append(clean)
+        if len(candidates) >= max_items:
+            return candidates
+
+    if "gemini" in haystack and "gemini ai" not in seen:
+        candidates.append("ожидается интеграция с Gemini AI")
+    if "android xr" in haystack and all("android xr" not in item.lower() for item in candidates):
+        candidates.insert(0, "новая платформа Android XR")
+
+    return candidates[:max_items]
+
+
+def normalize_tehnio_intro_text(value: str, limit: int) -> str:
+    clean = normalize_body_paragraph(value, limit=limit)
+    if not clean or looks_untranslated_text(clean):
+        return ""
+    return clean
+
+
+def normalize_tehnio_intro_sentence(value: str, limit: int) -> str:
+    clean = normalize_analysis_sentence(value, limit=limit)
+    if not clean or looks_untranslated_text(clean):
+        return ""
+    if comparable_text_key(clean) in GENERIC_TAKEAWAY_KEYS or comparable_text_key(clean) in GENERIC_INTERESTING_KEYS:
+        return ""
+    clean = strip_leading_connector(clean)
+    clean = re.sub(
+        r"^(?:по сути|коротко|что важно|это значит,? что|это показывает,? что|это говорит о том,? что)\s*",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    ).strip(" ,.")
+    if len(clean.split()) < 4:
+        return ""
+    if clean[0].islower():
+        clean = clean[0].upper() + clean[1:]
+    return clean.rstrip(".") + "."
+
+
+def build_tehnio_intro_heuristic(item: CandidateItem) -> str:
+    haystack = f"{item.title} {item.summary}".lower()
+    brand = detect_tehnio_primary_brand(item)
+    if not brand:
+        return ""
+
+    if "android xr" in haystack and "vision pro" in haystack:
+        tail = ""
+        if any(marker in haystack for marker in ("lighter", "cheaper", "доступ", "легк")):
+            tail = " Ставка делается на более лёгкие и доступные гарнитуры для массового рынка."
+        elif "gemini" in haystack:
+            tail = " Одной из ключевых функций платформы может стать интеграция Gemini AI."
+        return f"{brand} вместе с партнёрами развивает Android XR как ответ Apple Vision Pro.{tail}".strip()
+
+    if "gemini" in haystack and "android" in haystack:
+        return f"{brand} усиливает Android-экосистему за счёт более тесной интеграции с Gemini AI."
+
+    return ""
+
+
+def normalize_fact_candidate(value: str, limit: int = 72) -> str:
+    clean = normalize_analysis_sentence(value, limit=limit)
+    if not clean or looks_untranslated_text(clean):
+        return ""
+    clean = strip_leading_connector(clean)
+    clean = clean.rstrip(".")
+    clean = re.sub(r"^(?:среди подтвержденных деталей уже есть|в центре новости оказалась|коротко,?\s*)", "", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"^(партн(?:е|ё)ры),\s+", r"\1: ", clean, flags=re.IGNORECASE)
+    clean = clean.strip(" ,.")
+    if not clean:
+        return ""
+    if clean[0].isupper():
+        clean = clean[0].lower() + clean[1:]
+    return clean
+
+
+def build_tehnio_hashtags(item: CandidateItem, analysis: NewsAnalysis, max_items: int) -> list[str]:
+    if item.generated_hashtags:
+        generated_tags: list[str] = []
+        seen: set[str] = set()
+        for raw in item.generated_hashtags:
+            clean = normalize_tehnio_tag(raw)
+            if not clean or clean in seen:
+                continue
+            seen.add(clean)
+            generated_tags.append(clean)
+
+        base_tags = ["tech", "tehno"][:max_items]
+        primary_tags = [tag for tag in generated_tags if tag not in {"tech", "tehno"}]
+        room_for_primary = max(0, max_items - len(base_tags))
+        return [*primary_tags[:room_for_primary], *base_tags][:max_items]
+
+    haystack = f"{item.title} {item.summary}".lower()
+    tags: list[str] = []
+    seen: set[str] = set()
+
+    def append(tag: str) -> None:
+        clean = normalize_tehnio_tag(tag)
+        if not clean or clean in seen:
+            return
+        seen.add(clean)
+        tags.append(clean)
+
+    model_tag = normalize_tehnio_tag(extract_model_hashtag(f"{item.title}. {item.summary}"))
+    if model_tag:
+        append(model_tag)
+
+    for tag in detect_tehnio_brands(item):
+        append(tag)
+
+    topical_rules = (
+        ("android xr", "androidxr"),
+        ("vision pro", "visionpro"),
+        ("gemini", "gemini"),
+        ("android", "android"),
+        ("iphone", "iphone"),
+        ("ipad", "ipad"),
+        ("mac", "mac"),
+        ("windows", "windows"),
+        ("vr", "vr"),
+        ("ar", "ar"),
+        ("xr", "xr"),
+        ("ai", "ai"),
+        ("chip", "chips"),
+        ("processor", "chips"),
+        ("airpods", "airpods"),
+        ("wearable", "wearables"),
+    )
+    for phrase, tag in topical_rules:
+        if phrase_in_text(haystack, phrase):
+            append(tag)
+
+    append("tech")
+    append("tehno")
+    base_tags = ["tech", "tehno"][:max_items]
+    primary_tags = [tag for tag in tags if tag not in {"tech", "tehno"}]
+    room_for_primary = max(0, max_items - len(base_tags))
+    return [*primary_tags[:room_for_primary], *base_tags][:max_items]
+
+
+def render_tehnio_hashtags(tags: list[str]) -> str:
+    return " ".join(f"#{escape_text(tag)}" for tag in tags if tag)
+
+
+def normalize_tehnio_tag(value: str) -> str:
+    clean = re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+    if len(clean) < 2:
+        return ""
+    return clean[:24]
+
+
+def strip_wrapping_quotes(value: str) -> str:
+    clean = (value or "").strip()
+    clean = clean.strip("«»\"' ")
+    return clean
+
+
+def detect_tehnio_primary_brand(item: CandidateItem) -> str:
+    brands = detect_tehnio_brands(item)
+    return brands[0] if brands else ""
+
+
+def detect_tehnio_brands(item: CandidateItem, max_items: int = 4) -> list[str]:
+    haystack = f"{item.title} {item.summary}".lower()
+    matches: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for phrase, tag in BRAND_TAGS:
+        index = haystack.find(phrase)
+        if index == -1 or tag in seen:
+            continue
+        seen.add(tag)
+        matches.append((index, tag))
+    matches.sort(key=lambda value: value[0])
+    return [tag for _index, tag in matches[:max_items]]
 
 
 def truncate_story_text(text: str, limit: int) -> str:

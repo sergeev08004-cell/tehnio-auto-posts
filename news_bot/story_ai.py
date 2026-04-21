@@ -48,20 +48,24 @@ class StoryEnhancer:
             self.cache[item.fingerprint] = enhanced
             return enhanced
 
-        if not self.config.llm.enabled or not self.config.llm.api_key:
+        llm_requested = self.config.llm.enabled or bool(self.config.llm.api_key)
+        if not llm_requested or not self.config.llm.api_key:
             self.cache[item.fingerprint] = enhanced
             return enhanced
 
         try:
             payload = self._generate_payload(item, selected_persona)
-            summary = normalize_summary(
-                str(payload.get("summary", "") or ""),
-                max_sentences=self.config.llm.summary_max_sentences
+            headline = normalize_headline(str(payload.get("headline", "") or ""))
+            intro = normalize_intro(
+                str(payload.get("intro", "") or ""),
+                max_sentences=min(self.config.llm.summary_max_sentences, 3)
             )
+            facts = normalize_fact_lines(payload.get("facts"), max_items=4)
             comment = normalize_comment(
                 payload.get("comment", ""),
                 max_chars=self.config.llm.persona_max_chars
             )
+            hashtags = normalize_hashtags(payload.get("hashtags"), max_items=8)
         except Exception as error:
             if verbose:
                 print(f"[llm] source={item.source_name} error={error}")
@@ -69,10 +73,16 @@ class StoryEnhancer:
             return enhanced
 
         updated = enhanced
-        if summary:
-            updated = replace(updated, summary=summary)
+        if headline:
+            updated = replace(updated, generated_headline=headline)
+        if intro:
+            updated = replace(updated, summary=intro, generated_intro=intro)
+        if facts:
+            updated = replace(updated, generated_facts=facts)
         if comment:
             updated = replace(updated, persona_comment=comment)
+        if hashtags:
+            updated = replace(updated, generated_hashtags=hashtags)
 
         self.cache[item.fingerprint] = updated
         return updated
@@ -82,10 +92,15 @@ class StoryEnhancer:
         system_prompt = (
             "Ты редактор русскоязычного Telegram-канала о гаджетах и технологиях. "
             "Верни только JSON без пояснений. "
-            "JSON должен иметь поля summary и comment. "
-            "summary: 3-4 коротких предложения, без кликбейта, по сути, на русском языке. "
-            "comment: одна короткая цитатная реплика выбранного персонажа, 1-2 предложения, до 180 символов. "
-            "Комментарий должен быть ярким, но не уходить в абсурд и не повторять summary."
+            "JSON должен иметь поля headline, intro, facts, comment и hashtags. "
+            "headline: короткий сильный заголовок на русском, 6-12 слов, без кликбейта. "
+            "intro: 2-3 предложения на русском, коротко и по сути, единым связным абзацем. "
+            "facts: массив из 3-4 коротких фактов без маркеров списка и без точки в конце. "
+            "comment: одна короткая цитатная реплика выбранного персонажа, 1-2 предложения, до 220 символов. "
+            "hashtags: массив из 4-8 lowercase latin tags без символа #. "
+            "Не выдумывай факты, цифры и партнеров, которых нет в исходных данных. "
+            "Не пиши обрывками и не копируй сырой машинный перевод. "
+            "Текст должен быть живым, чистым и редакторским."
         )
         user_prompt = (
             f"Тип поста: {item.post_label or 'новость'}\n"
@@ -97,8 +112,19 @@ class StoryEnhancer:
             f"Credibility: {item.credibility}\n"
             f"Выбранный персонаж: {persona_name}\n"
             f"Стиль персонажа: {persona_style}\n"
-            "Сделай summary фактологичным. Если это инсайд, дай понять, что данные предварительные. "
+            "Сделай headline, intro и facts фактологичными. Если это инсайд, дай понять, что данные предварительные. "
             "Если это подтвержденная новость, пиши увереннее. "
+            "Не перенасыщай comment театральностью: пусть реплика будет умной, образной и уместной, а не карикатурной. "
+            "Если данных мало, лучше написать короче, чем додумывать детали. "
+            "Ориентир по формату поста:\n"
+            "✅ НОВОСТЬ: Google готовит конкурента Vision Pro — устройства Android XR\n\n"
+            "Google совместно с партнёрами работает над новой платформой Android XR, которая должна стать ответом Apple Vision Pro.\n\n"
+            "📌 Что известно:\n"
+            "— новая платформа Android XR для VR/AR\n"
+            "— ожидается интеграция с Gemini AI\n\n"
+            "💬 Архимед:\n"
+            "«...». \n\n"
+            "#google #androidxr #vr #ar #tech #tehno\n"
             "В comment пиши только за выбранного персонажа."
         )
 
@@ -243,12 +269,45 @@ def extract_json_object(raw_text: str) -> dict:
     return json.loads(candidate)
 
 
-def normalize_summary(value: str, max_sentences: int) -> str:
+def normalize_intro(value: str, max_sentences: int) -> str:
     parts = [normalize_text(part) for part in SENTENCE_SPLIT_RE.split(value or "") if normalize_text(part)]
     if not parts:
         return ""
     summary = " ".join(parts[:max_sentences]).strip()
-    return truncate_text(summary, 650)
+    return truncate_text(summary, 420)
+
+
+def normalize_headline(value: str) -> str:
+    clean = normalize_text(value).strip(" .")
+    if not clean:
+        return ""
+    if len(clean.split()) > 12:
+        clean = " ".join(clean.split()[:12]).strip(" .")
+    return clean
+
+
+def normalize_fact_lines(payload, max_items: int) -> list[str]:
+    if isinstance(payload, list):
+        raw_items = [str(item or "") for item in payload]
+    elif isinstance(payload, str):
+        raw_items = [part for part in re.split(r"\n+", payload) if part.strip()]
+    else:
+        return []
+
+    facts: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        clean = normalize_text(raw).lstrip("-•— ").rstrip(".")
+        if not clean:
+            continue
+        key = clean.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        facts.append(clean)
+        if len(facts) >= max_items:
+            break
+    return facts
 
 
 def normalize_comment(value, max_chars: int) -> str:
@@ -256,6 +315,28 @@ def normalize_comment(value, max_chars: int) -> str:
     if not clean:
         return ""
     return truncate_text(clean, max_chars)
+
+
+def normalize_hashtags(payload, max_items: int) -> list[str]:
+    if isinstance(payload, list):
+        raw_items = [str(item or "") for item in payload]
+    elif isinstance(payload, str):
+        raw_items = [part for part in re.split(r"[\s,]+", payload) if part.strip()]
+    else:
+        return []
+
+    tags: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        clean = raw.strip().lstrip("#").lower()
+        clean = re.sub(r"[^a-z0-9]+", "", clean)
+        if len(clean) < 2 or clean in seen:
+            continue
+        seen.add(clean)
+        tags.append(clean)
+        if len(tags) >= max_items:
+            break
+    return tags
 
 
 def build_fallback_persona_comment(item: CandidateItem, persona_name: str, max_chars: int) -> str:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List
 
@@ -34,6 +34,10 @@ class CandidateItem:
     original_summary: str = ""
     persona_name: str = ""
     persona_comment: str = ""
+    generated_headline: str = ""
+    generated_intro: str = ""
+    generated_facts: List[str] = field(default_factory=list)
+    generated_hashtags: List[str] = field(default_factory=list)
 
     @property
     def published_at_utc(self) -> datetime:
