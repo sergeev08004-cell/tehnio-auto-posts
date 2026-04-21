@@ -57,6 +57,14 @@ LOW_VALUE_MARKERS = (
     "watch now",
     "/video",
     " video",
+    "profile",
+    "legacy",
+    "anniversary",
+    "top 50",
+    "during his tenure",
+    "during her tenure",
+    "time as ceo",
+    "chief executive",
 )
 OUT_OF_SCOPE_NEWS_MARKERS = (
     "war",

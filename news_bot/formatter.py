@@ -2290,6 +2290,8 @@ def build_tehnio_fallback_headline(item: CandidateItem, analysis: NewsAnalysis) 
     brand = detect_tehnio_primary_brand(item)
     subject = shorten_subject(analysis.subject or "")
     generic_subjects = {comparable_text_key(value) for value in GENERIC_HEADLINE_SUBJECTS}
+    subject_key = comparable_text_key(subject)
+    brand_key = comparable_text_key(brand)
 
     if "android xr" in haystack and "vision pro" in haystack:
         if brand:
@@ -2301,10 +2303,10 @@ def build_tehnio_fallback_headline(item: CandidateItem, analysis: NewsAnalysis) 
         return "Android XR выходит в центр новой гонки"
     if "gemini" in haystack and brand:
         return f"{brand} делает ставку на устройства с Gemini"
-    if brand and subject and comparable_text_key(subject) not in generic_subjects:
+    if brand and subject and subject_key not in generic_subjects and subject_key != brand_key:
         return f"{brand} раскрыла детали о {subject}"
     if brand:
-        return f"{brand} в центре новой техноистории"
+        return f"{brand} снова в центре tech-повестки"
     return "Технологическая новость дня"
 
 
@@ -2364,7 +2366,7 @@ def build_tehnio_intro_paragraphs(item: CandidateItem, analysis: NewsAnalysis, c
 
 def build_tehnio_fact_lines(item: CandidateItem, analysis: NewsAnalysis, max_items: int) -> list[str]:
     if item.generated_facts:
-        facts = [normalize_fact_candidate(value, limit=86) for value in item.generated_facts]
+        facts = [normalize_fact_candidate(value, limit=96) for value in item.generated_facts]
         return [fact for fact in facts if fact][:max_items]
 
     candidates: list[str] = []
@@ -2372,7 +2374,7 @@ def build_tehnio_fact_lines(item: CandidateItem, analysis: NewsAnalysis, max_ite
     haystack = f"{item.title} {item.summary}".lower()
 
     for value in analysis.specs + analysis.numbers:
-        clean = normalize_fact_candidate(value)
+        clean = normalize_fact_candidate(value, limit=96)
         if clean and clean.lower() not in seen:
             seen.add(clean.lower())
             candidates.append(clean)
@@ -2380,7 +2382,7 @@ def build_tehnio_fact_lines(item: CandidateItem, analysis: NewsAnalysis, max_ite
             return candidates
 
     for sentence in split_story_sentences(item.summary or "", max_items=8):
-        clean = normalize_fact_candidate(sentence)
+        clean = normalize_fact_candidate(sentence, limit=96)
         if not clean or clean.lower() in seen:
             continue
         seen.add(clean.lower())
@@ -2443,8 +2445,8 @@ def build_tehnio_intro_heuristic(item: CandidateItem) -> str:
     return ""
 
 
-def normalize_fact_candidate(value: str, limit: int = 72) -> str:
-    clean = normalize_analysis_sentence(value, limit=limit)
+def normalize_fact_candidate(value: str, limit: int = 96) -> str:
+    clean = normalize_complete_fact(value, limit=limit)
     if not clean or looks_untranslated_text(clean):
         return ""
     clean = strip_leading_connector(clean)
@@ -2457,6 +2459,57 @@ def normalize_fact_candidate(value: str, limit: int = 72) -> str:
     if clean[0].isupper():
         clean = clean[0].lower() + clean[1:]
     return clean
+
+
+def normalize_complete_fact(value: str, limit: int) -> str:
+    raw = normalize_analysis_sentence(value, limit=max(limit * 2, 140))
+    if not raw:
+        return ""
+    raw = raw.rstrip(".")
+    for separator in ("; ", " — ", " – ", ". ", ", but ", ", and ", ", но ", ", а ", ", чтобы ", ", because "):
+        head = raw.split(separator, 1)[0].strip()
+        if 16 <= len(head) <= limit:
+            raw = head
+            break
+
+    if len(raw) > limit:
+        return ""
+    if raw.endswith("..."):
+        return ""
+    if fact_looks_unfinished(raw):
+        return ""
+    return raw
+
+
+def fact_looks_unfinished(value: str) -> bool:
+    clean = normalize_analysis_sentence(value, limit=200).lower().rstrip(".!?")
+    if not clean:
+        return True
+    trailing_words = {
+        "и",
+        "а",
+        "но",
+        "или",
+        "чтобы",
+        "который",
+        "которая",
+        "которые",
+        "одного",
+        "нового",
+        "and",
+        "but",
+        "or",
+        "with",
+        "without",
+        "into",
+        "for",
+        "to",
+        "of",
+        "one",
+        "single",
+    }
+    last_word = clean.split()[-1]
+    return last_word in trailing_words
 
 
 def build_tehnio_hashtags(item: CandidateItem, analysis: NewsAnalysis, max_items: int) -> list[str]:

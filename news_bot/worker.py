@@ -22,6 +22,13 @@ NON_NEWS_SCOPE_PATTERNS = (
     re.compile(r"\beditor'?s note\b", re.IGNORECASE),
     re.compile(r"\bwhy\b.{0,80}\binvested\b", re.IGNORECASE),
     re.compile(r"\bbig bet on\b", re.IGNORECASE),
+    re.compile(r"\bprofile\b", re.IGNORECASE),
+    re.compile(r"\blegacy\b", re.IGNORECASE),
+    re.compile(r"\banniversary\b", re.IGNORECASE),
+    re.compile(r"\btop\s+\d+\b", re.IGNORECASE),
+    re.compile(r"\bduring\s+(?:his|her|their)\s+tenure\b", re.IGNORECASE),
+    re.compile(r"\btime\s+(?:as|spent as)\s+(?:the\s+)?(?:ceo|chief executive)\b", re.IGNORECASE),
+    re.compile(r"\byears?\s+(?:as|of)\s+(?:the\s+)?(?:ceo|chief executive)\b", re.IGNORECASE),
 )
 OUT_OF_SCOPE_WORLD_NEWS_PATTERNS = (
     re.compile(r"\bwar\b", re.IGNORECASE),

@@ -20,6 +20,7 @@ PERSONA_STYLES = {
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 WHITESPACE_RE = re.compile(r"\s+")
+PERSON_NAME_RE = re.compile(r"^(?P<name>[A-ZА-ЯЁ][a-zа-яё]+(?:\s+[A-ZА-ЯЁ][a-zа-яё]+){1,2})\b")
 
 
 class StoryEnhancer:
@@ -355,7 +356,7 @@ def build_fallback_persona_comment(item: CandidateItem, persona_name: str, max_c
         comment = herodotus_line(subject, first_fact, insider_story)
     else:
         comment = (
-            f"Вокруг {subject} снова столько церемонии, будто без этого мир встанет. "
+            "Эту историю снова подают так, будто без нее мир встанет. "
             f"Если все опять сводится к {focus}, пафоса тут явно больше, чем пользы."
         )
 
@@ -365,17 +366,20 @@ def build_fallback_persona_comment(item: CandidateItem, persona_name: str, max_c
 def herodotus_line(subject: str, first_fact: str, insider_story: bool) -> str:
     if insider_story:
         return (
-            f"Говорят, что история вокруг {subject} только набирает ход. "
+            "Говорят, что эта история только набирает ход. "
             f"Пока {first_fact.lower()}, но летописец подождал бы еще одного подтверждения."
         )
     return (
         f"Говорят, что {first_fact.lower()}. "
-        f"Для сюжета вокруг {subject} это уже не шепот, а заметная запись на полях истории."
+        "Это уже не шепот, а заметная запись на полях истории."
     )
 
 
 def extract_subject(item: CandidateItem) -> str:
     subject = normalize_text(item.title)
+    person_name = extract_person_name(subject)
+    if person_name:
+        return person_name
     for separator in (" — ", " – ", ":", " - "):
         if separator in subject:
             head = normalize_text(subject.split(separator, 1)[0])
@@ -392,6 +396,8 @@ def extract_subject(item: CandidateItem) -> str:
 
 def detect_focus(item: CandidateItem) -> str:
     haystack = f"{item.title} {item.summary}".lower()
+    if any(marker in haystack for marker in ("ceo", "chief executive", "tenure", "leadership", "tim cook", "руковод", "генеральн", "директор")):
+        return "управленческому подходу"
     if any(marker in haystack for marker in ("price", "pricing", "цена", "стоим")):
         return "цене"
     if any(marker in haystack for marker in ("chip", "processor", "gpu", "cpu", "чип", "процессор")):
@@ -411,11 +417,70 @@ def extract_first_fact(item: CandidateItem) -> str:
     summary = normalize_text(item.summary)
     if summary:
         first = SENTENCE_SPLIT_RE.split(summary)[0]
-        clean = normalize_text(first)
+        clean = normalize_fact_sentence(first)
         if clean:
             return clean
     title = normalize_text(item.title)
     return title or "появились новые подробности"
+
+
+def extract_person_name(value: str) -> str:
+    match = PERSON_NAME_RE.match(normalize_text(value))
+    if not match:
+        return ""
+    return normalize_text(match.group("name"))
+
+
+def normalize_fact_sentence(value: str, limit: int = 180) -> str:
+    clean = normalize_text(value)
+    if not clean:
+        return ""
+    clean = re.split(r"\s+[—–-]\s+|;\s+", clean, maxsplit=1)[0].strip()
+    if len(clean) > limit:
+        candidate = clean[:limit]
+        for separator in (". ", ", but ", ", and ", ", но ", ", а ", ", чтобы ", ", потому что "):
+            parts = clean.split(separator, 1)
+            if len(parts) > 1 and 40 <= len(parts[0]) <= limit:
+                clean = parts[0].strip()
+                break
+        else:
+            snippet = candidate.rsplit(" ", 1)[0].strip()
+            if not snippet:
+                snippet = candidate.strip()
+            clean = snippet
+    clean = clean.rstrip(",;:- ")
+    if is_unfinished_clause(clean):
+        return ""
+    return clean
+
+
+def is_unfinished_clause(value: str) -> bool:
+    clean = normalize_text(value).lower().rstrip(".!?")
+    if not clean:
+        return True
+    trailing_words = {
+        "и",
+        "а",
+        "но",
+        "или",
+        "чтобы",
+        "который",
+        "которая",
+        "которые",
+        "that",
+        "and",
+        "but",
+        "or",
+        "with",
+        "without",
+        "into",
+        "for",
+        "to",
+        "of",
+        "one",
+    }
+    last_word = clean.split()[-1]
+    return clean.endswith("...") or last_word in trailing_words
 
 
 def normalize_text(value: str) -> str:
